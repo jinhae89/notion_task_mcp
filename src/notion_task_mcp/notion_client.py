@@ -452,12 +452,15 @@ class NotionTaskClient:
         has_more = True
         start_cursor = None
 
+        # API 2025-09-03: data_source_id 사용
+        data_source_id = await self._get_data_source_id()
+
         while has_more:
             if start_cursor:
                 query_params["start_cursor"] = start_cursor
 
             response = await self.client.client.post(
-                f"https://api.notion.com/v1/databases/{self.database_id}/query",
+                f"https://api.notion.com/v1/data_sources/{data_source_id}/query",
                 json={k: v for k, v in query_params.items() if k != "database_id"},
             )
             response = response.json()
