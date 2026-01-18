@@ -61,7 +61,7 @@ class NotionTaskClient:
         if not self.database_id:
             raise ValueError("NOTION_DATABASE_ID가 필요합니다.")
 
-        self.client = AsyncClient(auth=self.api_key)
+        self.client = AsyncClient(auth=self.api_key, notion_version="2022-06-28")
 
     def _parse_task(self, page: dict[str, Any]) -> Task:
         """Notion 페이지를 Task 모델로 변환."""
@@ -455,7 +455,11 @@ class NotionTaskClient:
             if start_cursor:
                 query_params["start_cursor"] = start_cursor
 
-            response = await self.client.databases.query(**query_params)  # type: ignore[attr-defined]
+            response = await self.client.client.post(
+                f"https://api.notion.com/v1/databases/{self.database_id}/query",
+                json={k: v for k, v in query_params.items() if k != "database_id"},
+            )
+            response = response.json()
             for page in response["results"]:
                 tasks.append(self._parse_task(page))
 
