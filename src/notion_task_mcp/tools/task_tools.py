@@ -1,6 +1,6 @@
 """Task 관련 MCP Tools."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from mcp.server import Server
@@ -52,12 +52,12 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                         },
                         "status": {
                             "type": "string",
-                            "enum": ["보류", "시작전", "진행중", "완료", "배포됨", "보관"],
+                            "enum": ["보류", "시작 전", "진행 중", "완료", "배포됨", "보관"],
                             "description": "상태 필터",
                         },
                         "status_group": {
                             "type": "string",
-                            "enum": ["할일", "진행 중", "완료"],
+                            "enum": ["to_do", "in_progress", "complete"],
                             "description": "상태 그룹 필터",
                         },
                         "priority": {
@@ -65,9 +65,9 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                             "enum": ["낮음", "중간", "높음"],
                             "description": "우선순위 필터",
                         },
-                        "assignee": {
+                        "assignee_id": {
                             "type": "string",
-                            "description": "담당자 ID 필터",
+                            "description": "담당자 User ID 필터",
                         },
                         "labels": {
                             "type": "array",
@@ -103,6 +103,10 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                             "type": "string",
                             "description": "상위 항목 ID 필터",
                         },
+                        "has_parent": {
+                            "type": "boolean",
+                            "description": "상위 항목 유무 필터 (true: 있음, false: 없음)",
+                        },
                         "page_size": {
                             "type": "integer",
                             "description": "페이지 크기 (기본값: 100)",
@@ -128,17 +132,17 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                         },
                         "status": {
                             "type": "string",
-                            "enum": ["보류", "시작전", "진행중", "완료", "배포됨", "보관"],
-                            "description": "상태 (기본값: 시작전)",
+                            "enum": ["보류", "시작 전", "진행 중", "완료", "배포됨", "보관"],
+                            "description": "상태 (기본값: 시작 전)",
                         },
                         "priority": {
                             "type": "string",
                             "enum": ["낮음", "중간", "높음"],
                             "description": "우선순위",
                         },
-                        "assignee": {
+                        "assignee_id": {
                             "type": "string",
-                            "description": "담당자 ID",
+                            "description": "담당자 User ID",
                         },
                         "start_date": {
                             "type": "string",
@@ -189,7 +193,7 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                         },
                         "status": {
                             "type": "string",
-                            "enum": ["보류", "시작전", "진행중", "완료", "배포됨", "보관"],
+                            "enum": ["보류", "시작 전", "진행 중", "완료", "배포됨", "보관"],
                             "description": "상태",
                         },
                         "priority": {
@@ -197,9 +201,9 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                             "enum": ["낮음", "중간", "높음"],
                             "description": "우선순위",
                         },
-                        "assignee": {
+                        "assignee_id": {
                             "type": "string",
-                            "description": "담당자 ID",
+                            "description": "담당자 User ID",
                         },
                         "start_date": {
                             "type": "string",
@@ -210,6 +214,11 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                             "type": "string",
                             "format": "date",
                             "description": "종료일 (YYYY-MM-DD)",
+                        },
+                        "done_date": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "완료 일시 (ISO 8601)",
                         },
                         "labels": {
                             "type": "array",
@@ -256,7 +265,7 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                         },
                         "status": {
                             "type": "string",
-                            "enum": ["보류", "시작전", "진행중", "완료", "배포됨", "보관"],
+                            "enum": ["보류", "시작 전", "진행 중", "완료", "배포됨", "보관"],
                             "description": "변경할 상태",
                         },
                     },
@@ -274,12 +283,12 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                             "items": {"type": "string"},
                             "description": "Notion 페이지 ID 목록",
                         },
-                        "assignee": {
+                        "assignee_id": {
                             "type": "string",
-                            "description": "담당자 ID",
+                            "description": "담당자 User ID",
                         },
                     },
-                    "required": ["task_ids", "assignee"],
+                    "required": ["task_ids", "assignee_id"],
                 },
             ),
         ]
@@ -287,26 +296,34 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
     @server.call_tool()  # type: ignore[untyped-decorator]
     async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         """도구 호출 처리."""
+        import json
 
         def task_to_dict(task: Any) -> dict[str, Any]:
             """Task를 딕셔너리로 변환."""
             return {
                 "id": task.id,
-                "no": task.no,
+                "url": task.url,
+                "task_no": task.task_no,
                 "title": task.title,
-                "type": task.task_type.value,
-                "status": task.status.value,
-                "status_group": task.status_group.value,
+                "type": task.task_type.value if task.task_type else None,
+                "status": task.status.value if task.status else None,
+                "status_group": task.status_group.value if task.status_group else None,
                 "priority": task.priority.value if task.priority else None,
-                "assignee": task.assignee,
+                "assignee_id": task.assignee_id,
                 "assignee_name": task.assignee_name,
-                "creator": task.creator,
+                "creator_id": task.creator_id,
+                "creator_name": task.creator_name,
                 "start_date": task.start_date.isoformat() if task.start_date else None,
                 "end_date": task.end_date.isoformat() if task.end_date else None,
+                "done_date": task.done_date.isoformat() if task.done_date else None,
                 "labels": task.labels,
                 "services": task.services,
                 "parent_id": task.parent_id,
                 "children_ids": task.children_ids,
+                "period": task.period,
+                "progress": task.progress,
+                "created_time": task.created_time.isoformat() if task.created_time else None,
+                "last_edited_time": task.last_edited_time.isoformat() if task.last_edited_time else None,
             }
 
         def parse_date(value: str | None) -> date | None:
@@ -315,7 +332,11 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                 return date.fromisoformat(value)
             return None
 
-        import json
+        def parse_datetime(value: str | None) -> datetime | None:
+            """날짜시간 문자열을 datetime 객체로 변환."""
+            if value:
+                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return None
 
         try:
             if name == "get_task":
@@ -328,7 +349,7 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                     status=TaskStatus(arguments["status"]) if arguments.get("status") else None,
                     status_group=StatusGroup(arguments["status_group"]) if arguments.get("status_group") else None,
                     priority=Priority(arguments["priority"]) if arguments.get("priority") else None,
-                    assignee=arguments.get("assignee"),
+                    assignee_id=arguments.get("assignee_id"),
                     labels=arguments.get("labels"),
                     services=arguments.get("services"),
                     start_date_from=parse_date(arguments.get("start_date_from")),
@@ -336,6 +357,7 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                     end_date_from=parse_date(arguments.get("end_date_from")),
                     end_date_to=parse_date(arguments.get("end_date_to")),
                     parent_id=arguments.get("parent_id"),
+                    has_parent=arguments.get("has_parent"),
                 )
                 page_size = arguments.get("page_size", 100)
                 tasks = await client.list_tasks(filter_=filter_, page_size=page_size)
@@ -347,7 +369,7 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                     task_type=TaskType(arguments["task_type"]) if arguments.get("task_type") else TaskType.TASK,
                     status=TaskStatus(arguments["status"]) if arguments.get("status") else TaskStatus.NOT_STARTED,
                     priority=Priority(arguments["priority"]) if arguments.get("priority") else None,
-                    assignee=arguments.get("assignee"),
+                    assignee_id=arguments.get("assignee_id"),
                     start_date=parse_date(arguments.get("start_date")),
                     end_date=parse_date(arguments.get("end_date")),
                     labels=arguments.get("labels", []),
@@ -364,9 +386,10 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                     task_type=TaskType(arguments["task_type"]) if arguments.get("task_type") else None,
                     status=TaskStatus(arguments["status"]) if arguments.get("status") else None,
                     priority=Priority(arguments["priority"]) if arguments.get("priority") else None,
-                    assignee=arguments.get("assignee"),
+                    assignee_id=arguments.get("assignee_id"),
                     start_date=parse_date(arguments.get("start_date")),
                     end_date=parse_date(arguments.get("end_date")),
+                    done_date=parse_datetime(arguments.get("done_date")),
                     labels=arguments.get("labels"),
                     services=arguments.get("services"),
                     parent_id=arguments.get("parent_id"),
@@ -386,7 +409,7 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
             elif name == "batch_update_assignee":
                 tasks = await client.batch_update_assignee(
                     arguments["task_ids"],
-                    arguments["assignee"],
+                    arguments["assignee_id"],
                 )
                 result = {"count": len(tasks), "tasks": [task_to_dict(t) for t in tasks]}
 
@@ -396,4 +419,4 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
             return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
 
         except Exception as e:
-            return [TextContent(type="text", text=f"Error: {str(e)}")]
+            return [TextContent(type="text", text=f"Error: {e!s}")]

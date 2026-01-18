@@ -33,15 +33,19 @@ Jira와 유사한 티켓 기반 일감 관리 시스템을 Notion DB로 구현�
 
 #### models.py
 데이터 모델 정의 (모두 Pydantic BaseModel 또는 Enum):
-- `TaskType`: Task, Epic, Issue, Project
-- `TaskStatus`: 보류, 시작전, 진행중, 완료, 배포됨, 보관
-- `StatusGroup`: 할일, 진행 중, 완료
+- `TaskType`: Project, Task, Issue, Epic
+- `TaskStatus`: 보류, 시작 전, 진행 중, 완료, 배포됨, 보관 (⚠️ 띄어쓰기 주의)
+- `StatusGroup`: to_do, in_progress, complete (Notion 내부 값)
 - `Priority`: 낮음, 중간, 높음
+- `TaskLabel`: Mobile, Web, 기획, 디자인, 다국어, Backend
+- `TaskService`: ERP, WIM Service, 자사몰, WIM Admin, 글로벌홈페이지
 - `STATUS_GROUP_MAP`: 상태 → 그룹 매핑 상수
 - `Task`: 메인 Task 모델 (status_group 프로퍼티 포함)
+  - 새 필드: url, task_no, done_date, creator_id/creator_name, period, progress
+  - 시스템 필드: created_time, last_edited_time, last_edited_by
 - `TaskCreate`: Task 생성 요청 모델
-- `TaskUpdate`: Task 수정 요청 모델
-- `TaskFilter`: Task 필터 조건 모델
+- `TaskUpdate`: Task 수정 요청 모델 (done_date 포함)
+- `TaskFilter`: Task 필터 조건 모델 (has_parent 필터 추가)
 
 #### notion_client.py
 `NotionTaskClient` 클래스:
@@ -92,31 +96,36 @@ MCP Client → call_tool() → NotionTaskClient.method() → Notion API
 
 | 속성명 | Notion 타입 | 설명 |
 |--------|-------------|------|
-| No | Unique ID (자동생성) | Jira 티켓 ID와 같은 개념 |
+| ID | Unique ID (자동생성) | Jira 티켓 ID와 같은 개념 |
 | 제목 | Title | 티켓 제목 |
-| 타입 | Select | Task, Epic, Issue, Project |
-| 상태 | Status | 할일/진행중/완료 그룹 (아래 상세) |
+| 타입 | Select | Project, Task, Issue, Epic |
+| 상태 | Status | to_do/in_progress/complete 그룹 (아래 상세) |
 | 우선순위 | Select | 낮음, 중간, 높음 |
 | 담당자 | Person | 담당자 지정 |
-| 생성자 | Created by | 티켓 생성자 |
+| 생성자 | Person | 티켓 생성자 (수동 입력) |
 | 시작일 | Date | 작업 시작일 |
 | 종료일 | Date | 작업 종료일 |
-| period | Formula | 시작일~종료일 기간 계산 |
-| 라벨 | Multi-select | 분류 태그 |
-| 서비스 | Multi-select | 서비스/도메인 분류 |
-| 상위항목 | Relation (Self) | 부모 Task 참조 |
-| 하위항목 | Relation (Self) | 자식 Task 참조 |
+| Done | Date | 완료 일시 |
+| Period | Formula | 시작일~종료일 기간 계산 |
+| 진행율 | Formula | 하위 항목 기준 진행률 |
+| 라벨 | Multi-select | Mobile, Web, 기획, 디자인, 다국어, Backend |
+| 서비스 | Multi-select | ERP, WIM Service, 자사몰, WIM Admin, 글로벌홈페이지 |
+| 상위 항목 | Relation (Self) | 부모 Task 참조 (⚠️ 띄어쓰기) |
+| 하위 항목 | Relation (Self) | 자식 Task 참조 (⚠️ 띄어쓰기) |
+| 생성 일시 | Created time | 생성 시간 (시스템) |
+| 최종 편집 일시 | Last edited time | 수정 시간 (시스템) |
+| 최종 편집자 | Last edited by | 수정자 (시스템) |
 
 ### 상태(Status) 상세
 ```
-할일 (Todo)
+할일 (to_do)
 ├── 보류
-└── 시작전
+└── 시작 전    # ⚠️ 띄어쓰기
 
-진행 중 (In Progress)
-└── 진행중
+진행 중 (in_progress)
+└── 진행 중    # ⚠️ 띄어쓰기
 
-완료 (Done)
+완료 (complete)
 ├── 완료
 ├── 배포됨
 └── 보관

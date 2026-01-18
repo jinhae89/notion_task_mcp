@@ -1,7 +1,7 @@
 """Notion API 클라이언트 래퍼."""
 
 import os
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from notion_client import AsyncClient
@@ -21,19 +21,26 @@ from .models import (
 class NotionTaskClient:
     """Notion Task DB 클라이언트."""
 
-    # Notion 속성명 매핑
+    # Notion 속성명 매핑 (실제 DB 스키마 기준)
+    PROP_ID = "ID"  # unique_id (기존 No → ID)
     PROP_TITLE = "제목"
     PROP_TYPE = "타입"
     PROP_STATUS = "상태"
     PROP_PRIORITY = "우선순위"
     PROP_ASSIGNEE = "담당자"
-    PROP_CREATOR = "생성자"
+    PROP_CREATOR = "생성자"  # person 타입
     PROP_START_DATE = "시작일"
     PROP_END_DATE = "종료일"
+    PROP_DONE = "Done"  # 완료 일시
     PROP_LABELS = "라벨"
     PROP_SERVICES = "서비스"
-    PROP_PARENT = "상위항목"
-    PROP_CHILDREN = "하위항목"
+    PROP_PARENT = "상위 항목"  # ✅ 띄어쓰기
+    PROP_CHILDREN = "하위 항목"  # ✅ 띄어쓰기
+    PROP_PERIOD = "Period"  # ✅ 대문자
+    PROP_PROGRESS = "진행율"
+    PROP_CREATED_TIME = "생성 일시"
+    PROP_LAST_EDITED_TIME = "최종 편집 일시"
+    PROP_LAST_EDITED_BY = "최종 편집자"
 
     def __init__(
         self,
@@ -60,6 +67,12 @@ class NotionTaskClient:
         """Notion 페이지를 Task 모델로 변환."""
         props = page["properties"]
 
+        # ID (unique_id) 추출
+        task_no = None
+        if self.PROP_ID in props and props[self.PROP_ID].get("unique_id"):
+            unique_id = props[self.PROP_ID]["unique_id"]
+            task_no = unique_id.get("number")
+
         # 제목 추출
         title_prop = props.get(self.PROP_TITLE, {})
         title = ""
@@ -68,102 +81,156 @@ class NotionTaskClient:
 
         # 타입 추출
         type_prop = props.get(self.PROP_TYPE, {})
-        task_type = TaskType.TASK
+        task_type = None
         if type_prop.get("select"):
             type_name = type_prop["select"]["name"]
-            task_type = TaskType(type_name)
+            try:
+                task_type = TaskType(type_name)
+            except ValueError:
+                pass
 
         # 상태 추출
         status_prop = props.get(self.PROP_STATUS, {})
-        status = TaskStatus.NOT_STARTED
+        status = None
         if status_prop.get("status"):
             status_name = status_prop["status"]["name"]
-            status = TaskStatus(status_name)
+            try:
+                status = TaskStatus(status_name)
+            except ValueError:
+                pass
 
         # 우선순위 추출
         priority_prop = props.get(self.PROP_PRIORITY, {})
         priority = None
         if priority_prop.get("select"):
             priority_name = priority_prop["select"]["name"]
-            priority = Priority(priority_name)
+            try:
+                priority = Priority(priority_name)
+            except ValueError:
+                pass
 
-        # 담당자 추출
+        # 담당자 추출 (person 타입)
         assignee_prop = props.get(self.PROP_ASSIGNEE, {})
-        assignee = None
+        assignee_id = None
         assignee_name = None
         if assignee_prop.get("people") and len(assignee_prop["people"]) > 0:
             person = assignee_prop["people"][0]
-            assignee = person.get("id")
+            assignee_id = person.get("id")
             assignee_name = person.get("name")
 
-        # 생성자 추출
+        # 생성자 추출 (person 타입)
         creator_prop = props.get(self.PROP_CREATOR, {})
-        creator = None
-        if creator_prop.get("created_by"):
-            creator = creator_prop["created_by"].get("name")
+        creator_id = None
+        creator_name = None
+        if creator_prop.get("people") and len(creator_prop["people"]) > 0:
+            person = creator_prop["people"][0]
+            creator_id = person.get("id")
+            creator_name = person.get("name")
 
         # 날짜 추출
         start_date = None
-        end_date = None
         start_date_prop = props.get(self.PROP_START_DATE, {})
         if start_date_prop.get("date"):
             start_str = start_date_prop["date"].get("start")
             if start_str:
                 start_date = date.fromisoformat(start_str[:10])
 
+        end_date = None
         end_date_prop = props.get(self.PROP_END_DATE, {})
         if end_date_prop.get("date"):
             end_str = end_date_prop["date"].get("start")
             if end_str:
                 end_date = date.fromisoformat(end_str[:10])
 
+        # Done (완료 일시) 추출
+        done_date = None
+        done_prop = props.get(self.PROP_DONE, {})
+        if done_prop.get("date"):
+            done_str = done_prop["date"].get("start")
+            if done_str:
+                done_date = datetime.fromisoformat(done_str.replace("Z", "+00:00"))
+
         # 라벨 추출
         labels_prop = props.get(self.PROP_LABELS, {})
-        labels = []
+        labels: list[str] = []
         if labels_prop.get("multi_select"):
             labels = [item["name"] for item in labels_prop["multi_select"]]
 
         # 서비스 추출
         services_prop = props.get(self.PROP_SERVICES, {})
-        services = []
+        services: list[str] = []
         if services_prop.get("multi_select"):
             services = [item["name"] for item in services_prop["multi_select"]]
 
-        # 상위/하위 항목 추출
+        # 상위 항목 추출 (⚠️ 띄어쓰기)
         parent_prop = props.get(self.PROP_PARENT, {})
         parent_id = None
         if parent_prop.get("relation") and len(parent_prop["relation"]) > 0:
             parent_id = parent_prop["relation"][0]["id"]
 
+        # 하위 항목 추출 (⚠️ 띄어쓰기)
         children_prop = props.get(self.PROP_CHILDREN, {})
-        children_ids = []
+        children_ids: list[str] = []
         if children_prop.get("relation"):
             children_ids = [item["id"] for item in children_prop["relation"]]
 
-        # No (unique_id) 추출
-        no = None
-        if "No" in props and props["No"].get("unique_id"):
-            unique_id = props["No"]["unique_id"]
-            prefix = unique_id.get("prefix", "")
-            number = unique_id.get("number", "")
-            no = f"{prefix}-{number}" if prefix else str(number)
+        # 시스템 속성
+        created_time = None
+        if page.get("created_time"):
+            created_time = datetime.fromisoformat(
+                page["created_time"].replace("Z", "+00:00")
+            )
+
+        last_edited_time = None
+        if page.get("last_edited_time"):
+            last_edited_time = datetime.fromisoformat(
+                page["last_edited_time"].replace("Z", "+00:00")
+            )
+
+        last_edited_by = None
+        last_edited_by_prop = props.get(self.PROP_LAST_EDITED_BY, {})
+        if last_edited_by_prop.get("last_edited_by"):
+            last_edited_by = last_edited_by_prop["last_edited_by"].get("id")
+
+        # Formula 속성 (Period, 진행율)
+        period = None
+        period_prop = props.get(self.PROP_PERIOD, {})
+        if period_prop.get("formula"):
+            formula = period_prop["formula"]
+            if formula.get("string"):
+                period = formula["string"]
+
+        progress = None
+        progress_prop = props.get(self.PROP_PROGRESS, {})
+        if progress_prop.get("formula"):
+            formula = progress_prop["formula"]
+            if formula.get("number") is not None:
+                progress = formula["number"]
 
         return Task(
             id=page["id"],
-            no=no,
+            url=page.get("url"),
+            task_no=task_no,
             title=title,
             task_type=task_type,
             status=status,
             priority=priority,
-            assignee=assignee,
+            assignee_id=assignee_id,
             assignee_name=assignee_name,
-            creator=creator,
+            creator_id=creator_id,
+            creator_name=creator_name,
             start_date=start_date,
             end_date=end_date,
+            done_date=done_date,
             labels=labels,
             services=services,
             parent_id=parent_id,
             children_ids=children_ids,
+            created_time=created_time,
+            last_edited_time=last_edited_time,
+            last_edited_by=last_edited_by,
+            period=period,
+            progress=progress,
         )
 
     def _build_properties(
@@ -189,21 +256,27 @@ class NotionTaskClient:
         # 우선순위
         if data.priority is not None:
             props[self.PROP_PRIORITY] = {"select": {"name": data.priority.value}}
-        elif is_update and data.priority is None and hasattr(data, "priority"):
-            # 명시적으로 None 설정 시 제거
-            pass
 
         # 담당자
-        if data.assignee is not None:
-            props[self.PROP_ASSIGNEE] = {"people": [{"id": data.assignee}]}
+        if data.assignee_id is not None:
+            props[self.PROP_ASSIGNEE] = {"people": [{"id": data.assignee_id}]}
 
         # 시작일
         if data.start_date is not None:
             props[self.PROP_START_DATE] = {"date": {"start": data.start_date.isoformat()}}
+        elif is_update and hasattr(data, "start_date") and data.start_date is None:
+            # 명시적으로 None 설정 시 제거
+            props[self.PROP_START_DATE] = {"date": None}
 
         # 종료일
         if data.end_date is not None:
             props[self.PROP_END_DATE] = {"date": {"start": data.end_date.isoformat()}}
+        elif is_update and hasattr(data, "end_date") and data.end_date is None:
+            props[self.PROP_END_DATE] = {"date": None}
+
+        # 완료 일시 (Done) - TaskUpdate에서만
+        if isinstance(data, TaskUpdate) and data.done_date is not None:
+            props[self.PROP_DONE] = {"date": {"start": data.done_date.isoformat()}}
 
         # 라벨
         if data.labels is not None:
@@ -217,9 +290,11 @@ class NotionTaskClient:
                 "multi_select": [{"name": service} for service in data.services]
             }
 
-        # 상위항목
+        # 상위 항목 (⚠️ 띄어쓰기)
         if data.parent_id is not None:
             props[self.PROP_PARENT] = {"relation": [{"id": data.parent_id}]}
+        elif is_update and hasattr(data, "parent_id") and data.parent_id is None:
+            props[self.PROP_PARENT] = {"relation": []}
 
         return props
 
@@ -259,10 +334,10 @@ class NotionTaskClient:
                 "select": {"equals": filter_.priority.value},
             })
 
-        if filter_.assignee:
+        if filter_.assignee_id:
             conditions.append({
                 "property": self.PROP_ASSIGNEE,
-                "people": {"contains": filter_.assignee},
+                "people": {"contains": filter_.assignee_id},
             })
 
         if filter_.labels:
@@ -313,6 +388,18 @@ class NotionTaskClient:
             conditions.append({
                 "property": self.PROP_PARENT,
                 "relation": {"contains": filter_.parent_id},
+            })
+
+        # 상위 항목 유무 필터
+        if filter_.has_parent is True:
+            conditions.append({
+                "property": self.PROP_PARENT,
+                "relation": {"is_not_empty": True},
+            })
+        elif filter_.has_parent is False:
+            conditions.append({
+                "property": self.PROP_PARENT,
+                "relation": {"is_empty": True},
             })
 
         if not conditions:
@@ -448,19 +535,19 @@ class NotionTaskClient:
     async def batch_update_assignee(
         self,
         task_ids: list[str],
-        assignee: str,
+        assignee_id: str,
     ) -> list[Task]:
         """여러 Task 담당자 일괄 변경.
 
         Args:
             task_ids: Notion 페이지 ID 목록.
-            assignee: 담당자 ID.
+            assignee_id: 담당자 User ID.
 
         Returns:
             수정된 Task 목록.
         """
         updated_tasks = []
         for task_id in task_ids:
-            task = await self.update_task(task_id, TaskUpdate(assignee=assignee))
+            task = await self.update_task(task_id, TaskUpdate(assignee_id=assignee_id))
             updated_tasks.append(task)
         return updated_tasks

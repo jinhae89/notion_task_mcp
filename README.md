@@ -241,31 +241,37 @@ MCP가 기대하는 Notion DB 속성:
 
 | 속성명 | Notion 타입 | 필수 | 설명 |
 |--------|-------------|------|------|
-| No | Unique ID | - | 자동 생성 ID |
+| ID | Unique ID | - | 자동 생성 ID |
 | 제목 | Title | ✅ | Task 제목 |
-| 타입 | Select | - | Task, Epic, Issue, Project |
-| 상태 | Status | - | 할일/진행중/완료 그룹 |
+| 타입 | Select | - | Project, Task, Issue, Epic |
+| 상태 | Status | - | to_do/in_progress/complete 그룹 |
 | 우선순위 | Select | - | 낮음, 중간, 높음 |
 | 담당자 | Person | - | 담당자 |
-| 생성자 | Created by | - | 생성자 (자동) |
+| 생성자 | Person | - | 생성자 (수동 입력) |
 | 시작일 | Date | - | 시작일 |
 | 종료일 | Date | - | 종료일 |
-| 라벨 | Multi-select | - | 분류 태그 |
-| 서비스 | Multi-select | - | 서비스/도메인 |
-| 상위항목 | Relation (Self) | - | 부모 Task |
-| 하위항목 | Relation (Self) | - | 자식 Task |
+| Done | Date | - | 완료 일시 |
+| Period | Formula | - | 기간 계산 |
+| 진행율 | Formula | - | 진행률 (읽기 전용) |
+| 라벨 | Multi-select | - | Mobile, Web, 기획, 디자인, 다국어, Backend |
+| 서비스 | Multi-select | - | ERP, WIM Service, 자사몰, WIM Admin, 글로벌홈페이지 |
+| 상위 항목 | Relation (Self) | - | 부모 Task (⚠️ 띄어쓰기) |
+| 하위 항목 | Relation (Self) | - | 자식 Task (⚠️ 띄어쓰기) |
+| 생성 일시 | Created time | - | 생성 시간 (시스템) |
+| 최종 편집 일시 | Last edited time | - | 수정 시간 (시스템) |
+| 최종 편집자 | Last edited by | - | 수정자 (시스템) |
 
 ### 상태 그룹
 
 ```
-할일 (Todo)
+할일 (to_do)
 ├── 보류
-└── 시작전
+└── 시작 전    # ⚠️ 띄어쓰기
 
-진행 중 (In Progress)
-└── 진행중
+진행 중 (in_progress)
+└── 진행 중    # ⚠️ 띄어쓰기
 
-완료 (Done)
+완료 (complete)
 ├── 완료
 ├── 배포됨
 └── 보관
