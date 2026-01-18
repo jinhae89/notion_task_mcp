@@ -59,6 +59,7 @@ Jira와 유사한 티켓 기반 일감 관리 시스템을 Notion DB로 구현�
 - `get_task`: 단건 조회
 - `list_tasks`: 목록 조회 (필터, 페이지네이션)
 - `list_templates`: 템플릿 목록 조회 (Task, Issue, Project, Epic)
+- `get_template_by_type`: 타입명으로 템플릿 조회 (타입별 도구용)
 - `create_task`: 생성 (템플릿 옵션 지원)
 - `update_task`: 수정
 - `delete_task`: 삭제 (아카이브)
@@ -67,9 +68,10 @@ Jira와 유사한 티켓 기반 일감 관리 시스템을 Notion DB로 구현�
 
 #### tools/task_tools.py
 `register_task_tools(server, client)` 함수:
-- `list_tools()`: 8개 MCP Tool 스키마 정의
-  - get_task, list_tasks, list_templates, create_task, update_task, delete_task
-  - batch_update_status, batch_update_assignee
+- `list_tools()`: 11개 MCP Tool 스키마 정의
+  - 기본: get_task, list_tasks, list_templates, create_task, update_task, delete_task
+  - 일괄: batch_update_status, batch_update_assignee
+  - 타입별: create_epic, create_project, create_issue (템플릿+타입 자동 적용)
 - `call_tool(name, arguments)`: Tool 호출 핸들러
 
 #### server.py
@@ -142,12 +144,20 @@ MCP Client → call_tool() → NotionTaskClient.method() → Notion API
 2. **필터/검색**: 상태, 타입, 담당자, 우선순위, 날짜 등으로 필터링
 3. **일괄 처리**: 여러 Task 동시 상태 변경, 담당자 일괄 지정
 4. **템플릿 지원**: Task/Issue/Project/Epic 템플릿으로 생성 (본문 자동 적용)
+5. **타입별 전용 도구**: create_epic, create_project, create_issue (템플릿+타입 자동)
 
 ### 템플릿 기능
 Notion DB에 설정된 템플릿을 사용하여 Task 생성 가능:
 - `list_templates`: 사용 가능한 템플릿 목록 조회
 - `create_task`에 `template_id` 또는 `use_default_template` 옵션 전달
 - 템플릿 사용 시 페이지 본문(체크리스트, 섹션 등)이 자동 적용됨
+
+**타입별 전용 도구** (권장):
+| 도구 | 자동 적용 |
+|------|----------|
+| `create_epic` | Epic 템플릿 + Epic 타입 |
+| `create_project` | Project 템플릿 + Project 타입 |
+| `create_issue` | Issue 템플릿 + Issue 타입 |
 
 **사용 가능한 템플릿**:
 | 템플릿 | 용도 |
