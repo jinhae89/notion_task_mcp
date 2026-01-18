@@ -307,6 +307,139 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                     "required": ["task_ids", "assignee_id"],
                 },
             ),
+            Tool(
+                name="create_epic",
+                description="Epic 생성. Epic 템플릿이 자동 적용됩니다.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "제목 (필수)",
+                        },
+                        "priority": {
+                            "type": "string",
+                            "enum": ["낮음", "중간", "높음"],
+                            "description": "우선순위",
+                        },
+                        "assignee_id": {
+                            "type": "string",
+                            "description": "담당자 User ID",
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "시작일 (YYYY-MM-DD)",
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "종료일 (YYYY-MM-DD)",
+                        },
+                        "labels": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "라벨 목록",
+                        },
+                        "services": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "서비스 목록",
+                        },
+                    },
+                    "required": ["title"],
+                },
+            ),
+            Tool(
+                name="create_project",
+                description="Project 생성. Project 템플릿이 자동 적용됩니다.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "제목 (필수)",
+                        },
+                        "priority": {
+                            "type": "string",
+                            "enum": ["낮음", "중간", "높음"],
+                            "description": "우선순위",
+                        },
+                        "assignee_id": {
+                            "type": "string",
+                            "description": "담당자 User ID",
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "시작일 (YYYY-MM-DD)",
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "종료일 (YYYY-MM-DD)",
+                        },
+                        "labels": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "라벨 목록",
+                        },
+                        "services": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "서비스 목록",
+                        },
+                    },
+                    "required": ["title"],
+                },
+            ),
+            Tool(
+                name="create_issue",
+                description="Issue 생성. Issue 템플릿이 자동 적용됩니다.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "제목 (필수)",
+                        },
+                        "priority": {
+                            "type": "string",
+                            "enum": ["낮음", "중간", "높음"],
+                            "description": "우선순위",
+                        },
+                        "assignee_id": {
+                            "type": "string",
+                            "description": "담당자 User ID",
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "시작일 (YYYY-MM-DD)",
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "종료일 (YYYY-MM-DD)",
+                        },
+                        "labels": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "라벨 목록",
+                        },
+                        "services": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "서비스 목록",
+                        },
+                        "parent_id": {
+                            "type": "string",
+                            "description": "상위 항목 ID (Epic/Project)",
+                        },
+                    },
+                    "required": ["title"],
+                },
+            ),
         ]
 
     @server.call_tool()  # type: ignore[untyped-decorator]
@@ -444,6 +577,34 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                     arguments["assignee_id"],
                 )
                 result = {"count": len(tasks), "tasks": [task_to_dict(t) for t in tasks]}
+
+            elif name in ("create_epic", "create_project", "create_issue"):
+                # 타입별 전용 도구: 타입과 템플릿 자동 적용
+                type_map = {
+                    "create_epic": TaskType.EPIC,
+                    "create_project": TaskType.PROJECT,
+                    "create_issue": TaskType.ISSUE,
+                }
+                task_type = type_map[name]
+
+                # 해당 타입의 템플릿 찾기
+                template = await client.get_template_by_type(task_type.value)
+                template_id = template["id"] if template else None
+
+                data = TaskCreate(
+                    title=arguments["title"],
+                    task_type=task_type,
+                    priority=Priority(arguments["priority"]) if arguments.get("priority") else None,
+                    assignee_id=arguments.get("assignee_id"),
+                    start_date=parse_date(arguments.get("start_date")),
+                    end_date=parse_date(arguments.get("end_date")),
+                    labels=arguments.get("labels", []),
+                    services=arguments.get("services", []),
+                    parent_id=arguments.get("parent_id"),
+                    template_id=template_id,
+                )
+                task = await client.create_task(data)
+                result = task_to_dict(task)
 
             else:
                 return [TextContent(type="text", text=f"Unknown tool: {name}")]

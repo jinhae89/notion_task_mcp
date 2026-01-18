@@ -623,3 +623,19 @@ class NotionTaskClient:
 
         templates: list[dict[str, Any]] = data.get("templates", [])
         return templates
+
+    async def get_template_by_type(self, task_type: str) -> dict[str, Any] | None:
+        """타입명으로 템플릿 조회.
+
+        Args:
+            task_type: Task 타입 (Epic, Project, Issue, Task)
+
+        Returns:
+            매칭되는 템플릿 또는 None.
+        """
+        templates = await self.list_templates()
+        for t in templates:
+            # 템플릿 이름에 타입이 포함되어 있는지 확인
+            if task_type.lower() in t["name"].lower():
+                return t
+        return None
