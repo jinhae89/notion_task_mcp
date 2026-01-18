@@ -206,16 +206,28 @@ Claude에서 다음과 같이 테스트:
 
 ## 제공 도구
 
+### 기본 도구
+
 | 도구 | 설명 | 주요 파라미터 |
 |------|------|--------------|
 | `get_task` | Task 단건 조회 | `task_id` |
 | `list_tasks` | Task 목록 조회 | `status`, `task_type`, `assignee`, `priority`, `labels`, `services`, 날짜 범위 등 |
 | `list_templates` | 템플릿 목록 조회 | - |
-| `create_task` | Task 생성 | `title` (필수), `task_type`, `status`, `priority`, `assignee`, `labels`, `template_id` 등 |
+| `create_task` | Task 생성 (범용) | `title` (필수), `task_type`, `status`, `priority`, `template_id` 등 |
 | `update_task` | Task 수정 | `task_id` (필수), 수정할 필드들 |
 | `delete_task` | Task 삭제 (아카이브) | `task_id` |
 | `batch_update_status` | 여러 Task 상태 일괄 변경 | `task_ids`, `status` |
 | `batch_update_assignee` | 여러 Task 담당자 일괄 변경 | `task_ids`, `assignee` |
+
+### 타입별 전용 도구 ⭐
+
+템플릿과 타입이 자동 적용되는 편의 도구입니다.
+
+| 도구 | 설명 | 자동 적용 |
+|------|------|----------|
+| `create_epic` | Epic 생성 | Epic 템플릿 + Epic 타입 |
+| `create_project` | Project 생성 | Project 템플릿 + Project 타입 |
+| `create_issue` | Issue 생성 | Issue 템플릿 + Issue 타입 |
 
 ### 사용 예시
 
@@ -224,8 +236,13 @@ Claude에서 다음과 같이 테스트:
 "오늘 마감인 Task 목록 보여줘"
 "높은 우선순위 Task 중 진행 중인 것들 알려줘"
 
-# 생성
-"새 Task 만들어줘: API 문서 작성, 우선순위 높음, 라벨은 문서"
+# 생성 (타입별 전용 도구 - 권장)
+"Epic 만들어줘: Q1 신규 기능 개발"
+"프로젝트 생성해줘: 모바일 앱 리뉴얼"
+"이슈 등록해줘: 로그인 페이지 버그"
+
+# 생성 (범용)
+"새 Task 만들어줘: API 문서 작성, 우선순위 높음"
 
 # 수정
 "TASK-123 상태를 완료로 변경해줘"
