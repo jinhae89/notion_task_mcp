@@ -8,6 +8,7 @@ Jira와 유사한 티켓 기반 일감 관리 시스템을 Notion DB로 구현�
 - **Language**: Python 3.11+
 - **MCP SDK**: mcp (공식 Python SDK)
 - **Notion Client**: notion-client (공식 Python SDK)
+- **Notion API Version**: 2025-09-03 (템플릿 기능 지원)
 - **패키지 관리**: uv 또는 pip
 - **타입 체크**: mypy (권장)
 
@@ -44,18 +45,21 @@ Jira와 유사한 티켓 기반 일감 관리 시스템을 Notion DB로 구현�
   - 새 필드: url, task_no, done_date, creator_id/creator_name, period, progress
   - 시스템 필드: created_time, last_edited_time, last_edited_by
 - `TaskCreate`: Task 생성 요청 모델
+  - 템플릿 옵션: template_id, use_default_template
 - `TaskUpdate`: Task 수정 요청 모델 (done_date 포함)
 - `TaskFilter`: Task 필터 조건 모델 (has_parent 필터 추가)
 
 #### notion_client.py
 `NotionTaskClient` 클래스:
-- `__init__`: API Key, Database ID로 초기화
+- `__init__`: API Key, Database ID로 초기화, API 버전 2025-09-03
 - `_parse_task`: Notion 페이지 → Task 모델 변환
 - `_build_properties`: Task 데이터 → Notion 속성 변환
 - `_build_filter`: TaskFilter → Notion 필터 쿼리 변환
+- `_get_data_source_id`: Database에서 data_source_id 조회 (템플릿 API용, 캐시)
 - `get_task`: 단건 조회
 - `list_tasks`: 목록 조회 (필터, 페이지네이션)
-- `create_task`: 생성
+- `list_templates`: 템플릿 목록 조회 (Task, Issue, Project, Epic)
+- `create_task`: 생성 (템플릿 옵션 지원)
 - `update_task`: 수정
 - `delete_task`: 삭제 (아카이브)
 - `batch_update_status`: 상태 일괄 변경
@@ -63,7 +67,9 @@ Jira와 유사한 티켓 기반 일감 관리 시스템을 Notion DB로 구현�
 
 #### tools/task_tools.py
 `register_task_tools(server, client)` 함수:
-- `list_tools()`: 7개 MCP Tool 스키마 정의
+- `list_tools()`: 8개 MCP Tool 스키마 정의
+  - get_task, list_tasks, list_templates, create_task, update_task, delete_task
+  - batch_update_status, batch_update_assignee
 - `call_tool(name, arguments)`: Tool 호출 핸들러
 
 #### server.py
@@ -135,6 +141,21 @@ MCP Client → call_tool() → NotionTaskClient.method() → Notion API
 1. **CRUD**: Task 생성, 조회, 수정, 삭제
 2. **필터/검색**: 상태, 타입, 담당자, 우선순위, 날짜 등으로 필터링
 3. **일괄 처리**: 여러 Task 동시 상태 변경, 담당자 일괄 지정
+4. **템플릿 지원**: Task/Issue/Project/Epic 템플릿으로 생성 (본문 자동 적용)
+
+### 템플릿 기능
+Notion DB에 설정된 템플릿을 사용하여 Task 생성 가능:
+- `list_templates`: 사용 가능한 템플릿 목록 조회
+- `create_task`에 `template_id` 또는 `use_default_template` 옵션 전달
+- 템플릿 사용 시 페이지 본문(체크리스트, 섹션 등)이 자동 적용됨
+
+**사용 가능한 템플릿**:
+| 템플릿 | 용도 |
+|--------|------|
+| Task | 일반 작업 (기본 템플릿) |
+| Issue | 버그/이슈 트래킹 |
+| Project | 프로젝트 관리 |
+| Epic | 대규모 기능/에픽 |
 
 ## Important Constraints
 - Notion API Rate Limit: 평균 3 requests/sec
