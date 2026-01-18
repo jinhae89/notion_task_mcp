@@ -61,7 +61,8 @@ class NotionTaskClient:
         if not self.database_id:
             raise ValueError("NOTION_DATABASE_ID가 필요합니다.")
 
-        self.client = AsyncClient(auth=self.api_key, notion_version="2022-06-28")
+        self.client = AsyncClient(auth=self.api_key, notion_version="2025-09-03")
+        self._data_source_id: str | None = None  # 캐시
 
     def _parse_task(self, page: dict[str, Any]) -> Task:
         """Notion 페이지를 Task 모델로 변환."""
@@ -478,10 +479,36 @@ class NotionTaskClient:
             생성된 Task.
         """
         properties = self._build_properties(data)
-        page = await self.client.pages.create(
-            parent={"database_id": self.database_id},
-            properties=properties,
-        )
+
+        # 템플릿 옵션 결정
+        template: dict[str, Any] | None = None
+        parent: dict[str, Any] = {"database_id": self.database_id}
+
+        if data.template_id:
+            template = {"type": "template_id", "template_id": data.template_id}
+        elif data.use_default_template:
+            # 기본 템플릿 사용 시 data_source_id로 parent 변경
+            data_source_id = await self._get_data_source_id()
+            template = {"type": "default"}
+            parent = {"data_source_id": data_source_id}
+
+        # 템플릿 사용 시 직접 HTTP 요청 (SDK가 template 파라미터 미지원)
+        if template:
+            request_body: dict[str, Any] = {
+                "parent": parent,
+                "properties": properties,
+                "template": template,
+            }
+            response = await self.client.client.post(
+                "https://api.notion.com/v1/pages",
+                json=request_body,
+            )
+            page = response.json()
+        else:
+            page = await self.client.pages.create(
+                parent=parent,
+                properties=properties,
+            )
         return self._parse_task(page)
 
     async def update_task(self, task_id: str, data: TaskUpdate) -> Task:
@@ -555,3 +582,41 @@ class NotionTaskClient:
             task = await self.update_task(task_id, TaskUpdate(assignee_id=assignee_id))
             updated_tasks.append(task)
         return updated_tasks
+
+    async def _get_data_source_id(self) -> str:
+        """Database에서 data_source_id를 조회 (캐시 사용).
+
+        Returns:
+            data_source_id.
+        """
+        if self._data_source_id:
+            return self._data_source_id
+
+        # Database 조회하여 data_sources 추출
+        response = await self.client.client.get(
+            f"https://api.notion.com/v1/databases/{self.database_id}",
+        )
+        db = response.json()
+
+        data_sources = db.get("data_sources", [])
+        if not data_sources:
+            raise ValueError("Database에 data_source가 없습니다.")
+
+        self._data_source_id = data_sources[0]["id"]
+        return self._data_source_id
+
+    async def list_templates(self) -> list[dict[str, Any]]:
+        """사용 가능한 템플릿 목록 조회.
+
+        Returns:
+            템플릿 목록. 각 항목은 id, name, is_default 포함.
+        """
+        data_source_id = await self._get_data_source_id()
+
+        response = await self.client.client.get(
+            f"https://api.notion.com/v1/data_sources/{data_source_id}/templates",
+        )
+        data: dict[str, Any] = response.json()
+
+        templates: list[dict[str, Any]] = data.get("templates", [])
+        return templates

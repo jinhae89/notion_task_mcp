@@ -140,6 +140,9 @@ class TaskCreate(BaseModel):
     labels: list[str] = Field(default_factory=list, description="라벨 목록")
     services: list[str] = Field(default_factory=list, description="서비스 목록")
     parent_id: str | None = Field(default=None, description="상위 항목 ID")
+    # 템플릿 옵션
+    template_id: str | None = Field(default=None, description="템플릿 ID (지정 시 해당 템플릿 적용)")
+    use_default_template: bool = Field(default=False, description="기본 템플릿 사용 여부")
 
 
 class TaskUpdate(BaseModel):

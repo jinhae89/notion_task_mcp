@@ -116,8 +116,16 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                 },
             ),
             Tool(
+                name="list_templates",
+                description="사용 가능한 템플릿 목록 조회. 생성 시 사용할 수 있는 템플릿 반환.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {},
+                },
+            ),
+            Tool(
                 name="create_task",
-                description="새 Task 생성.",
+                description="새 Task 생성. 템플릿 지정 시 본문이 자동 적용됩니다.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -167,6 +175,14 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                         "parent_id": {
                             "type": "string",
                             "description": "상위 항목 ID",
+                        },
+                        "template_id": {
+                            "type": "string",
+                            "description": "템플릿 ID (list_templates로 조회 가능)",
+                        },
+                        "use_default_template": {
+                            "type": "boolean",
+                            "description": "기본 템플릿(Task) 사용 여부 (기본값: false)",
                         },
                     },
                     "required": ["title"],
@@ -363,6 +379,20 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                 tasks = await client.list_tasks(filter_=filter_, page_size=page_size)
                 result = {"count": len(tasks), "tasks": [task_to_dict(t) for t in tasks]}
 
+            elif name == "list_templates":
+                templates = await client.list_templates()
+                result = {
+                    "count": len(templates),
+                    "templates": [
+                        {
+                            "id": t["id"],
+                            "name": t["name"],
+                            "is_default": t.get("is_default", False),
+                        }
+                        for t in templates
+                    ],
+                }
+
             elif name == "create_task":
                 data = TaskCreate(
                     title=arguments["title"],
@@ -375,6 +405,8 @@ def register_task_tools(server: Server, client: NotionTaskClient) -> None:
                     labels=arguments.get("labels", []),
                     services=arguments.get("services", []),
                     parent_id=arguments.get("parent_id"),
+                    template_id=arguments.get("template_id"),
+                    use_default_template=arguments.get("use_default_template", False),
                 )
                 task = await client.create_task(data)
                 result = task_to_dict(task)
