@@ -210,7 +210,8 @@ Claude에서 다음과 같이 테스트:
 |------|------|--------------|
 | `get_task` | Task 단건 조회 | `task_id` |
 | `list_tasks` | Task 목록 조회 | `status`, `task_type`, `assignee`, `priority`, `labels`, `services`, 날짜 범위 등 |
-| `create_task` | Task 생성 | `title` (필수), `task_type`, `status`, `priority`, `assignee`, `labels` 등 |
+| `list_templates` | 템플릿 목록 조회 | - |
+| `create_task` | Task 생성 | `title` (필수), `task_type`, `status`, `priority`, `assignee`, `labels`, `template_id` 등 |
 | `update_task` | Task 수정 | `task_id` (필수), 수정할 필드들 |
 | `delete_task` | Task 삭제 (아카이브) | `task_id` |
 | `batch_update_status` | 여러 Task 상태 일괄 변경 | `task_ids`, `status` |
@@ -232,6 +233,45 @@ Claude에서 다음과 같이 테스트:
 # 일괄 처리
 "TASK-001, TASK-002, TASK-003 담당자를 홍길동으로 변경해줘"
 ```
+
+### 템플릿 사용
+
+Notion DB에 설정된 템플릿을 사용하여 Task를 생성할 수 있습니다.
+템플릿을 사용하면 페이지 본문(체크리스트, 섹션, 설명 등)이 자동으로 적용됩니다.
+
+#### 사용 가능한 템플릿
+
+| 템플릿 | 설명 |
+|--------|------|
+| Task | 일반 작업용 (기본 템플릿) |
+| Issue | 버그/이슈 트래킹용 |
+| Project | 프로젝트 관리용 |
+| Epic | 대규모 기능/에픽용 |
+
+#### 템플릿 사용 예시
+
+```
+# 템플릿 목록 확인
+"사용 가능한 템플릿 목록 보여줘"
+
+# 기본 템플릿(Task)으로 생성
+"기본 템플릿으로 Task 만들어줘: API 리팩토링"
+
+# 특정 템플릿으로 생성
+"Epic 템플릿으로 새 Epic 만들어줘: Q1 신규 기능 개발"
+"Issue 템플릿으로 버그 등록해줘: 로그인 오류"
+"Project 템플릿으로 프로젝트 생성해줘: 모바일 앱 v2.0"
+```
+
+#### create_task 템플릿 파라미터
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| `template_id` | string | 특정 템플릿 ID (list_templates로 조회 가능) |
+| `use_default_template` | boolean | 기본 템플릿 사용 여부 (기본값: false) |
+
+> **참고**: `template_id`와 `use_default_template` 중 하나만 사용하세요.
+> 둘 다 지정하지 않으면 빈 페이지로 생성됩니다.
 
 ---
 
