@@ -44,3 +44,7 @@ htmlcov/
 
 # ruff
 .ruff_cache/
+
+# Claude Code local skills (contains API keys)
+.claude/
+.agent/

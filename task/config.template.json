@@ -1,0 +1,16 @@
+{
+  "notion": {
+    "api_key": "",
+    "database_id": ""
+  },
+  "user": {
+    "notion_id": "",
+    "name": "",
+    "email": ""
+  },
+  "defaults": {
+    "priority": "중간",
+    "type": "Task",
+    "auto_assign": true
+  }
+}

@@ -358,6 +358,48 @@ Notion API는 평균 3 requests/sec 제한이 있습니다.
 
 ---
 
+---
+
+## Claude Code Skill (Task Skill)
+
+MCP 서버 외에도 Claude Code에서 바로 사용할 수 있는 **Task Skill**을 제공합니다.
+
+### Quick Start
+
+```bash
+# 1. Repository 클론
+git clone git@github.com:wirobotics/notion_task_mcp.git
+cd notion_task_mcp
+
+# 2. 설치 (API Key, DB ID, 사용자 정보 입력)
+./install.sh
+
+# 3. Claude Code 재시작 후 사용
+```
+
+### 사용 예시
+
+```
+"진행중인 Task"
+"Task 만들어줘"
+"WIRB-123 완료"
+"내 Project 알려줘"
+```
+
+### Skill 관리
+
+```bash
+# 사용자 정보 재설정
+~/.claude/skills/task/setup.sh
+
+# 삭제
+~/.claude/skills/task/uninstall.sh
+```
+
+자세한 내용은 [task/](task/) 폴더를 참고하세요.
+
+---
+
 ## 라이선스
 
 [MIT License](LICENSE)
